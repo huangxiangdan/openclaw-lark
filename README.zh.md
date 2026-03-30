@@ -1,10 +1,21 @@
 # OpenClaw  Lark/飞书 插件
 
+[English](./README.md) | 中文版
+
+## 当前 Codex 集成说明
+
+- 如果你要把这个飞书插件用于 `openclaw-codex-app-server` 集成，请使用这个仓库版本：
+  - `https://github.com/huangxiangdan/openclaw-lark`
+- 配套的 Codex 桥接插件仓库是：
+  - `https://github.com/huangxiangdan/openclaw-codex-app-server`
+- 在当前测试通过的方案里，这套 Codex 飞书回调走的是内部命令桥接链路，不是完全原生的飞书 interactive 分发链路。
+- 这个仓库已经包含该方案所需的兼容改动，包括显式卡片发送和通用卡片回调桥接。
+- 在当前测试过的 OpenClaw 运行时中，core 还没有提供和 Telegram / Discord 对等的完整原生飞书 interactive 分发能力，因此这里有意保留桥接实现。
+- 如果未来 OpenClaw core 补齐完整原生飞书 interactive 支持，这个仓库后续可以再迁移；在此之前，如果你要稳定跑通当前 Codex + 飞书流程，请优先使用这个仓库。
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm version](https://img.shields.io/npm/v/@larksuite/openclaw-lark.svg)](https://www.npmjs.com/package/@larksuite/openclaw-lark)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22-blue.svg)](https://nodejs.org/)
-
-[English](./README.md) | 中文版
 
 这是 OpenClaw 的官方  Lark/飞书 插件，由 Lark/飞书开放平台团队开发和维护。它将你的 OpenClaw Agent 无缝对接到  Lark/飞书 工作区，赋予其直接读写消息、文档、多维表格、日历、任务等应用的能力。
 

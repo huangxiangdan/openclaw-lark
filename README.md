@@ -1,10 +1,21 @@
 # OpenClaw Lark/Feishu Plugin
 
+[中文版](./README.zh.md) | English
+
+## Current Codex Integration Notice
+
+- If you are integrating this Feishu plugin with `openclaw-codex-app-server`, use this repository build:
+  - `https://github.com/huangxiangdan/openclaw-lark`
+- The paired Codex bridge plugin repository is:
+  - `https://github.com/huangxiangdan/openclaw-codex-app-server`
+- In the current tested setup, Feishu card callbacks for that Codex integration use an internal command bridge path instead of a fully native Feishu interactive dispatch path.
+- This repository includes the required compatibility changes for that setup, including explicit card delivery and generic card callback bridging.
+- OpenClaw core does not yet expose complete native Feishu interactive dispatch equivalent to Telegram/Discord in the tested runtime, so this repository intentionally keeps the bridge-based approach for now.
+- When OpenClaw core later adds full native Feishu interactive support, this repository can migrate to that path. Until then, use this repository if you need the current Codex + Feishu flow to work reliably.
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm version](https://img.shields.io/npm/v/@larksuite/openclaw-lark.svg)](https://www.npmjs.com/package/@larksuite/openclaw-lark)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22-blue.svg)](https://nodejs.org/)
-
-[中文版](./README.zh.md) | English
 
 This is the official Lark/Feishu plugin for OpenClaw, developed and maintained by the Lark/Feishu Open Platform team. It seamlessly connects your OpenClaw Agent to your Lark/Feishu workspace, enabling it to directly read from and write to messages, docs, bases, calendars, tasks, and more.
 
