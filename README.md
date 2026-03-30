@@ -61,6 +61,34 @@ Before you start, make sure you have the following:
 > npm install -g openclaw
 > ```
 
+## Install Options
+
+Install from npm:
+
+```bash
+openclaw plugins install @larksuite/openclaw-lark
+```
+
+Install from this GitHub project (community integration build):
+
+```bash
+git clone https://github.com/huangxiangdan/openclaw-lark.git
+cd openclaw-lark
+pnpm install
+pnpm build
+openclaw plugins install --link "$PWD"
+```
+
+Uninstall:
+
+```bash
+openclaw plugins uninstall @larksuite/openclaw-lark
+```
+
+If you are integrating with `openclaw-codex-app-server` and rely on Feishu interactive callbacks, prefer this repository build:
+
+- https://github.com/huangxiangdan/openclaw-lark
+
 ## Usage Guide
 
 [How to Use the Official Lark/Feishu Plugin for OpenClaw](https://bytedance.larkoffice.com/docx/MFK7dDFLFoVlOGxWCv5cTXKmnMh)

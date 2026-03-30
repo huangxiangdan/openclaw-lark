@@ -56,6 +56,34 @@
 > npm install -g openclaw
 > ```
 
+## 安装方式
+
+通过 npm 安装：
+
+```bash
+openclaw plugins install @larksuite/openclaw-lark
+```
+
+通过你的 GitHub 项目源码安装（当前集成推荐）：
+
+```bash
+git clone https://github.com/huangxiangdan/openclaw-lark.git
+cd openclaw-lark
+pnpm install
+pnpm build
+openclaw plugins install --link "$PWD"
+```
+
+卸载：
+
+```bash
+openclaw plugins uninstall @larksuite/openclaw-lark
+```
+
+如果你在对接 `openclaw-codex-app-server` 且依赖飞书卡片回调交互，建议优先使用以下仓库实现：
+
+- https://github.com/huangxiangdan/openclaw-lark
+
 ## 使用说明
 [OpenClaw  Lark/飞书官方插件使用指南](https://bytedance.larkoffice.com/docx/MFK7dDFLFoVlOGxWCv5cTXKmnMh)
 
