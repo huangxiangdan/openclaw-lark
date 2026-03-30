@@ -19,7 +19,7 @@ import { resolveFooterConfig } from '../core/footer-config';
 import { LarkClient } from '../core/lark-client';
 import { larkLogger } from '../core/lark-logger';
 import { sendMediaLark } from '../messaging/outbound/deliver';
-import { sendMarkdownCardFeishu, sendMessageFeishu } from '../messaging/outbound/send';
+import { sendCardFeishu, sendMarkdownCardFeishu, sendMessageFeishu } from '../messaging/outbound/send';
 import { type TypingIndicatorState, addTypingIndicator, removeTypingIndicator } from '../messaging/outbound/typing';
 import { isCardTableLimitError } from './card-error';
 import type { CreateFeishuReplyDispatcherParams, FeishuReplyDispatcherResult } from './reply-dispatcher-types';
@@ -28,6 +28,19 @@ import { StreamingCardController } from './streaming-card-controller';
 import { UnavailableGuard } from './unavailable-guard';
 
 const log = larkLogger('card/reply-dispatcher');
+
+function extractFeishuCard(payload: ReplyPayload): Record<string, unknown> | undefined {
+  const channelData = payload.channelData as Record<string, unknown> | undefined;
+  const feishuData =
+    channelData && typeof channelData.feishu === 'object' && channelData.feishu != null
+      ? (channelData.feishu as Record<string, unknown>)
+      : undefined;
+  const card =
+    feishuData && typeof feishuData.card === 'object' && feishuData.card != null
+      ? (feishuData.card as Record<string, unknown>)
+      : undefined;
+  return card;
+}
 
 // Re-export the params type for backward compatibility with dispatch.ts
 export type { CreateFeishuReplyDispatcherParams } from './reply-dispatcher-types';
@@ -216,6 +229,53 @@ export function createFeishuReplyDispatcher(params: CreateFeishuReplyDispatcherP
         : payload.mediaUrl
           ? [payload.mediaUrl]
           : [];
+      const explicitCard = extractFeishuCard(payload);
+      if (!text.trim() && payloadMediaUrls.length === 0) {
+        if (!explicitCard) {
+          log.debug('deliver: empty text/no media/no card, skipping');
+          return;
+        }
+      }
+
+      if (explicitCard) {
+        log.info('deliver: sending explicit channelData.feishu.card', {
+          chatId,
+        });
+        try {
+          await sendCardFeishu({
+            cfg,
+            to: chatId,
+            card: explicitCard,
+            replyToMessageId,
+            replyInThread,
+            accountId,
+          });
+        } catch (err) {
+          if (staticGuard?.terminate('deliver.explicitCard', err)) return;
+          log.warn('deliver: explicit card failed, falling back to text', {
+            chatId,
+            error: String(err),
+          });
+          if (text.trim()) {
+            try {
+              await sendMessageFeishu({
+                cfg,
+                to: chatId,
+                text,
+                replyToMessageId,
+                replyInThread,
+                accountId,
+              });
+            } catch (fallbackErr) {
+              if (staticGuard?.terminate('deliver.explicitCardFallbackText', fallbackErr)) return;
+              throw fallbackErr;
+            }
+          } else {
+            throw err;
+          }
+        }
+      }
+
       if (!text.trim() && payloadMediaUrls.length === 0) {
         log.debug('deliver: empty text and no media, skipping');
         return;

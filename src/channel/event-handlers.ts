@@ -13,6 +13,7 @@ import type { FeishuBotAddedEvent, FeishuMessageEvent, FeishuReactionCreatedEven
 import { handleFeishuMessage } from '../messaging/inbound/handler';
 import { handleFeishuReaction, resolveReactionContext } from '../messaging/inbound/reaction-handler';
 import { isMessageExpired } from '../messaging/inbound/dedup';
+import { dispatchSyntheticTextMessage } from '../messaging/inbound/synthetic-message';
 import { withTicket } from '../core/lark-ticket';
 import { larkLogger } from '../core/lark-logger';
 import { handleCardAction } from '../tools/auto-auth';
@@ -22,6 +23,49 @@ import { extractRawTextFromEvent, isLikelyAbortText } from './abort-detect';
 import type { MonitorContext } from './types';
 
 const elog = larkLogger('channel/event-handlers');
+
+interface GenericCardActionEvent {
+  operator?: { open_id?: string };
+  open_chat_id?: string;
+  open_message_id?: string;
+  context?: { open_chat_id?: string; open_message_id?: string };
+  action?: {
+    value?: {
+      command?: string;
+      text?: string;
+      thread_id?: string;
+    };
+  };
+}
+
+function extractGenericCallbackCommand(data: unknown):
+  | {
+      command: string;
+      senderOpenId: string;
+      chatId: string;
+      replyToMessageId: string;
+      threadId?: string;
+    }
+  | undefined {
+  const event = data as GenericCardActionEvent;
+  const rawCommand = event.action?.value?.command ?? event.action?.value?.text;
+  const command = typeof rawCommand === 'string' ? rawCommand.trim() : '';
+  const senderOpenId = event.operator?.open_id;
+  const chatId = event.open_chat_id ?? event.context?.open_chat_id;
+  const replyToMessageId = event.open_message_id ?? event.context?.open_message_id;
+  const threadId = event.action?.value?.thread_id;
+
+  if (!command.startsWith('/')) return undefined;
+  if (!senderOpenId || !chatId) return undefined;
+
+  return {
+    command,
+    senderOpenId,
+    chatId,
+    replyToMessageId: replyToMessageId || `card-action:${chatId}:${Date.now()}`,
+    threadId,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Event ownership validation
@@ -249,7 +293,42 @@ export async function handleCardActionEvent(ctx: MonitorContext, data: unknown):
     if (askResult !== undefined) return askResult;
 
     // Auto-auth card actions (OAuth device flow, app scope confirmation)
-    return await handleCardAction(data, ctx.cfg, ctx.accountId);
+    const authResult = await handleCardAction(data, ctx.cfg, ctx.accountId);
+    if (authResult !== undefined) return authResult;
+
+    // Generic fallback for card button callbacks: if a button carries a
+    // slash command in action.value.command (or action.value.text), inject
+    // it as a synthetic inbound text message so normal command routing runs.
+    const bridge = extractGenericCallbackCommand(data);
+    if (!bridge) return undefined;
+
+    const syntheticMessageId = `${bridge.replyToMessageId}:generic-action:${Date.now()}`;
+    setImmediate(() => {
+      dispatchSyntheticTextMessage({
+        cfg: ctx.cfg,
+        accountId: ctx.accountId,
+        chatId: bridge.chatId,
+        senderOpenId: bridge.senderOpenId,
+        text: bridge.command,
+        syntheticMessageId,
+        replyToMessageId: bridge.replyToMessageId,
+        threadId: bridge.threadId,
+        runtime: {
+          log: (msg: string) => ctx.log(msg),
+          error: (msg: string) => ctx.error(msg),
+        },
+        forceMention: true,
+      }).catch((err) => {
+        ctx.error(`feishu[${ctx.accountId}]: generic card-action bridge failed: ${String(err)}`);
+      });
+    });
+
+    return {
+      toast: {
+        type: 'success' as const,
+        content: '已收到操作，正在处理...',
+      },
+    };
   } catch (err) {
     elog.warn(`card.action.trigger handler error: ${err}`);
   }
