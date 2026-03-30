@@ -80,10 +80,10 @@ Install from npm:
 openclaw plugins install @larksuite/openclaw-lark
 ```
 
-Install from this GitHub project (community integration build):
+Install from this GitHub project:
 
 ```bash
-git clone https://github.com/huangxiangdan/openclaw-lark.git
+git clone https://github.com/larksuite/openclaw-lark.git
 cd openclaw-lark
 pnpm install
 pnpm build
@@ -95,10 +95,6 @@ Uninstall:
 ```bash
 openclaw plugins uninstall @larksuite/openclaw-lark
 ```
-
-If you are integrating with `openclaw-codex-app-server` and rely on Feishu interactive callbacks, prefer this repository build:
-
-- https://github.com/huangxiangdan/openclaw-lark
 
 ## Usage Guide
 
