@@ -20,6 +20,7 @@ import { handleAskUserAction } from '../tools/ask-user-question';
 import { buildQueueKey, enqueueFeishuChatTask, getActiveDispatcher, hasActiveTask } from './chat-queue';
 import { extractRawTextFromEvent, isLikelyAbortText } from './abort-detect';
 import type { MonitorContext } from './types';
+import { dispatchCardAction } from './card-action-forward';
 
 const elog = larkLogger('channel/event-handlers');
 
@@ -243,13 +244,16 @@ export async function handleBotMembershipEvent(
 
 export async function handleCardActionEvent(ctx: MonitorContext, data: unknown): Promise<unknown> {
   try {
-    // AskUserQuestion card interactions — injects synthetic message
-    // carrying user answers for the AI to receive in a new turn.
+    // AskUserQuestion：表单卡片交互（宿主内建能力优先）
     const askResult = handleAskUserAction(data, ctx.cfg, ctx.accountId);
     if (askResult !== undefined) return askResult;
 
-    // Auto-auth card actions (OAuth device flow, app scope confirmation)
-    return await handleCardAction(data, ctx.cfg, ctx.accountId);
+    // auto-auth：授权/权限引导相关卡片交互（宿主内建能力优先）
+    const authResult = await handleCardAction(data, ctx.cfg, ctx.accountId);
+    if (authResult !== undefined) return authResult;
+
+    // 业务自定义卡片交互：平台仅负责转发 card.action.trigger 给业务插件注册的 handler。
+    return await dispatchCardAction({ accountId: ctx.accountId, data });
   } catch (err) {
     elog.warn(`card.action.trigger handler error: ${err}`);
   }
