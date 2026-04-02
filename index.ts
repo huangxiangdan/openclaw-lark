@@ -27,8 +27,119 @@ import {
 import { registerCommands } from './src/commands/index';
 import { larkLogger } from './src/core/lark-logger';
 import { emitSecurityWarnings } from './src/core/security-check';
+import { sendMessageFeishu, sendCardFeishu } from './src/messaging/outbound/send';
+import { sendTextLark, sendCardLark } from './src/messaging/outbound/deliver';
 
 const log = larkLogger('plugin');
+
+function installRuntimeSurface(api: OpenClawPluginApi): void {
+  const channelRuntime = api.runtime.channel as typeof api.runtime.channel & {
+    lark?: Record<string, unknown>;
+    feishu?: Record<string, unknown>;
+  };
+
+  const requireConfig = () => {
+    if (!api.config) {
+      throw new Error('Feishu runtime surface requires api.config');
+    }
+    return api.config;
+  };
+
+  channelRuntime.lark ??= {};
+  channelRuntime.feishu ??= {};
+
+  if (typeof channelRuntime.lark.sendMessageLark !== 'function') {
+    channelRuntime.lark.sendMessageLark = async (
+      to: string,
+      text: string,
+      opts?: { accountId?: string; threadId?: string | number },
+    ) => {
+      const result = await sendTextLark({
+        cfg: requireConfig(),
+        to,
+        text,
+        accountId: opts?.accountId,
+        replyToMessageId: opts?.threadId != null ? String(opts.threadId) : undefined,
+        replyInThread: opts?.threadId != null,
+      });
+      return {
+        messageId: result.messageId,
+        chatId: result.chatId,
+        conversationId: result.chatId || to,
+      };
+    };
+  }
+
+  if (typeof channelRuntime.lark.sendCardLark !== 'function') {
+    channelRuntime.lark.sendCardLark = async (
+      to: string,
+      card: unknown,
+      opts?: { accountId?: string; threadId?: string | number },
+    ) => {
+      const result = await sendCardLark({
+        cfg: requireConfig(),
+        to,
+        card: (card ?? {}) as Record<string, unknown>,
+        accountId: opts?.accountId,
+        replyToMessageId: opts?.threadId != null ? String(opts.threadId) : undefined,
+        replyInThread: opts?.threadId != null,
+      });
+      return {
+        messageId: result.messageId,
+        chatId: result.chatId,
+        conversationId: result.chatId || to,
+      };
+    };
+  }
+
+  if (typeof channelRuntime.lark.sendCardFeishu !== 'function') {
+    channelRuntime.lark.sendCardFeishu = channelRuntime.lark.sendCardLark;
+  }
+
+  if (typeof channelRuntime.feishu.sendMessageFeishu !== 'function') {
+    channelRuntime.feishu.sendMessageFeishu = async (
+      to: string,
+      text: string,
+      opts?: { accountId?: string; threadId?: string | number },
+    ) => {
+      const result = await sendMessageFeishu({
+        cfg: requireConfig(),
+        to,
+        text,
+        accountId: opts?.accountId,
+        replyToMessageId: opts?.threadId != null ? String(opts.threadId) : undefined,
+        replyInThread: opts?.threadId != null,
+      });
+      return {
+        messageId: result.messageId,
+        chatId: result.chatId,
+        conversationId: result.chatId || to,
+      };
+    };
+  }
+
+  if (typeof channelRuntime.feishu.sendCardFeishu !== 'function') {
+    channelRuntime.feishu.sendCardFeishu = async (
+      to: string,
+      card: unknown,
+      opts?: { accountId?: string; threadId?: string | number },
+    ) => {
+      const result = await sendCardFeishu({
+        cfg: requireConfig(),
+        to,
+        card: (card ?? {}) as Record<string, unknown>,
+        accountId: opts?.accountId,
+        replyToMessageId: opts?.threadId != null ? String(opts.threadId) : undefined,
+        replyInThread: opts?.threadId != null,
+      });
+      return {
+        messageId: result.messageId,
+        chatId: result.chatId,
+        conversationId: result.chatId || to,
+      };
+    };
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Re-exports for external consumers
@@ -106,6 +217,7 @@ const plugin = {
   configSchema: emptyPluginConfigSchema(),
   register(api: OpenClawPluginApi): void {
     LarkClient.setRuntime(api.runtime);
+    installRuntimeSurface(api);
     api.registerChannel({ plugin: feishuPlugin });
 
     // ========================================

@@ -8,6 +8,13 @@
   - `https://github.com/huangxiangdan/openclaw-lark`
 - 配套的 Codex 桥接插件仓库是：
   - `https://github.com/huangxiangdan/openclaw-codex-app-server`
+- 当前推荐安装步骤：
+  - `git clone https://github.com/huangxiangdan/openclaw-lark.git`
+  - `cd openclaw-lark && pnpm install && pnpm build`
+  - `openclaw plugins install --link "$PWD"`
+  - `git clone https://github.com/huangxiangdan/openclaw-codex-app-server.git`
+  - `cd openclaw-codex-app-server`
+  - `openclaw plugins install --link "$PWD"`
 - 在当前测试通过的方案里，这套 Codex 飞书回调走的是内部命令桥接链路，不是完全原生的飞书 interactive 分发链路。
 - 这个仓库已经包含该方案所需的兼容改动，包括显式卡片发送和通用卡片回调桥接。
 - 在当前测试过的 OpenClaw 运行时中，core 还没有提供和 Telegram / Discord 对等的完整原生飞书 interactive 分发能力，因此这里有意保留桥接实现。

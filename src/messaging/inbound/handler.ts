@@ -39,6 +39,7 @@ import {
 import { type GateResult, checkMessageGate, readFeishuAllowFromStore } from './gate';
 import { injectInboundHandler } from './handler-registry';
 import { dispatchToAgent } from './dispatch';
+import { tryClaimInboundMessage } from './claim';
 import { resolveFeishuGroupConfig, splitLegacyGroupAllowFrom } from './policy';
 
 const logger = larkLogger('inbound/handler');
@@ -201,7 +202,28 @@ export async function handleFeishuMessage(params: {
     resolveCommandAuthorizedFromAuthorizers: core.channel.commands.resolveCommandAuthorizedFromAuthorizers,
   });
 
-  // 8. Dispatch to agent
+  // 8. Give OpenClaw plugins a chance to claim the inbound message before
+  //    it falls through to the default Feishu agent session.
+  const isSyntheticCommandBridge =
+    Boolean(forceMention) && ctx.messageId.includes(':generic-action:') && ctx.content.trim().startsWith('/');
+  if (!isSyntheticCommandBridge) {
+    try {
+      const claimed = await tryClaimInboundMessage({
+        ctx,
+        account,
+        commandAuthorized,
+      });
+      if (claimed) {
+        log(`feishu[${account.accountId}]: inbound claim handled message ${ctx.messageId}`);
+        logger.info(`inbound claim handled message ${ctx.messageId}`);
+        return;
+      }
+    } catch (err) {
+      error(`feishu[${account.accountId}]: inbound claim failed, falling back to default dispatch: ${String(err)}`);
+    }
+  }
+
+  // 9. Dispatch to agent
   // groupConfig and defaultGroupConfig are already resolved above.
 
   try {

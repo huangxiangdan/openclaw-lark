@@ -8,6 +8,13 @@
   - `https://github.com/huangxiangdan/openclaw-lark`
 - The paired Codex bridge plugin repository is:
   - `https://github.com/huangxiangdan/openclaw-codex-app-server`
+- Current recommended install steps:
+  - `git clone https://github.com/huangxiangdan/openclaw-lark.git`
+  - `cd openclaw-lark && pnpm install && pnpm build`
+  - `openclaw plugins install --link "$PWD"`
+  - `git clone https://github.com/huangxiangdan/openclaw-codex-app-server.git`
+  - `cd openclaw-codex-app-server`
+  - `openclaw plugins install --link "$PWD"`
 - In the current tested setup, Feishu card callbacks for that Codex integration use an internal command bridge path instead of a fully native Feishu interactive dispatch path.
 - This repository includes the required compatibility changes for that setup, including explicit card delivery and generic card callback bridging.
 - OpenClaw core does not yet expose complete native Feishu interactive dispatch equivalent to Telegram/Discord in the tested runtime, so this repository intentionally keeps the bridge-based approach for now.
