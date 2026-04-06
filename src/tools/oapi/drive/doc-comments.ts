@@ -430,44 +430,35 @@ export function registerDocCommentsTool(api: OpenClawPluginApi): boolean {
 
             const sdkElements = convertElementsToSDKFormat(p.elements);
 
-            // SDK 没有 fileCommentReply.create 方法，使用 invokeByPath 发起原始 HTTP 请求。
-            // 使用 tenant (应用身份) 而非 user，让 bot 以自己的名义回复评论。
+            // 使用 sdk.request() 发起请求（与 deliver.ts 一致），SDK 内部自动管理 TAT。
             // 双重 payload 格式兜底：先试 content.elements，失败再试 reply_elements。
-            let res = await client.invokeByPath(
-              'feishu_doc_comments.reply',
-              `/open-apis/drive/v1/files/${actualFileToken}/comments/${p.comment_id}/replies`,
-              {
-                method: 'POST',
-                body: {
-                  content: {
-                    elements: sdkElements,
-                  },
-                },
-                query: {
-                  file_type: actualFileType,
-                  user_id_type: userIdType,
-                },
-                as: 'tenant',
-              },
-            );
+            const replyUrl = `/open-apis/drive/v1/files/${actualFileToken}/comments/${p.comment_id}/replies`;
+            const replyParams = { file_type: actualFileType, user_id_type: userIdType };
 
-            // Fallback: 部分 API 版本使用 reply_elements 格式
-            if ((res as any).code !== 0) {
-              log.info(`doc_comments.reply: first attempt failed (code=${(res as any).code}), trying reply_elements format`);
-              res = await client.invokeByPath(
+            let res: any;
+            try {
+              res = await client.invoke(
                 'feishu_doc_comments.reply',
-                `/open-apis/drive/v1/files/${actualFileToken}/comments/${p.comment_id}/replies`,
-                {
+                (sdk) => (sdk as any).request({
                   method: 'POST',
-                  body: {
-                    reply_elements: sdkElements,
-                  },
-                  query: {
-                    file_type: actualFileType,
-                    user_id_type: userIdType,
-                  },
-                  as: 'tenant',
-                },
+                  url: replyUrl,
+                  params: replyParams,
+                  data: { content: { elements: sdkElements } },
+                }),
+                { as: 'tenant' },
+              );
+            } catch (firstErr) {
+              // Fallback: 部分 API 版本使用 reply_elements 格式
+              log.info(`doc_comments.reply: first attempt failed, trying reply_elements format`);
+              res = await client.invoke(
+                'feishu_doc_comments.reply',
+                (sdk) => (sdk as any).request({
+                  method: 'POST',
+                  url: replyUrl,
+                  params: replyParams,
+                  data: { reply_elements: sdkElements },
+                }),
+                { as: 'tenant' },
               );
             }
 
