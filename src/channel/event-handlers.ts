@@ -12,6 +12,8 @@
 import type { FeishuBotAddedEvent, FeishuMessageEvent, FeishuReactionCreatedEvent } from '../messaging/types';
 import { handleFeishuMessage } from '../messaging/inbound/handler';
 import { handleFeishuReaction, resolveReactionContext } from '../messaging/inbound/reaction-handler';
+import { handleFeishuCommentEvent } from '../messaging/inbound/comment-handler';
+import { parseFeishuDriveCommentNoticeEventPayload } from '../messaging/inbound/comment-context';
 import { isMessageExpired } from '../messaging/inbound/dedup';
 import { dispatchSyntheticTextMessage } from '../messaging/inbound/synthetic-message';
 import { withTicket } from '../core/lark-ticket';
@@ -21,6 +23,7 @@ import { handleAskUserAction } from '../tools/ask-user-question';
 import { buildQueueKey, enqueueFeishuChatTask, getActiveDispatcher, hasActiveTask } from './chat-queue';
 import { extractRawTextFromEvent, isLikelyAbortText } from './abort-detect';
 import type { MonitorContext } from './types';
+import { dispatchFeishuPluginInteractiveHandler } from './interactive-dispatch';
 
 const elog = larkLogger('channel/event-handlers');
 
@@ -282,23 +285,83 @@ export async function handleBotMembershipEvent(
 }
 
 // ---------------------------------------------------------------------------
+// Drive comment handler
+// ---------------------------------------------------------------------------
+
+export async function handleCommentEvent(ctx: MonitorContext, data: unknown): Promise<void> {
+  if (!isEventOwnershipValid(ctx, data)) return;
+  const { accountId, log, error } = ctx;
+  try {
+    const parsed = parseFeishuDriveCommentNoticeEventPayload(data);
+    if (!parsed) {
+      log(`feishu[${accountId}]: invalid comment event payload, skipping`);
+      return;
+    }
+
+    const commentId = parsed.comment_id ?? '';
+    const replyId = parsed.reply_id ?? '';
+    // Parser has normalized notice_meta fields into canonical top-level fields
+    const _senderOpenId = parsed.user_id?.open_id ?? '';
+    const isMentioned = parsed.is_mention ?? false;
+    const eventTimestamp = parsed.action_time;
+
+    log(
+      `feishu[${accountId}]: drive comment event: ` +
+        `type=${parsed.file_type}, comment=${commentId}` +
+        `${replyId ? `, reply=${replyId}` : ''}` +
+        `${isMentioned ? ', @bot' : ''}`,
+    );
+
+    // Dedup: build a deterministic key from the comment/reply IDs
+    const dedupKey = replyId ? `comment:${commentId}:reply:${replyId}` : `comment:${commentId}`;
+    if (!ctx.messageDedup.tryRecord(dedupKey, accountId)) {
+      log(`feishu[${accountId}]: duplicate comment event ${dedupKey}, skipping`);
+      return;
+    }
+
+    // Expiry check
+    if (isMessageExpired(eventTimestamp)) {
+      log(`feishu[${accountId}]: comment event expired, discarding`);
+      return;
+    }
+
+    // Dispatch the comment event (no queue serialization needed for comment threads)
+    await handleFeishuCommentEvent({
+      cfg: ctx.cfg,
+      event: parsed,
+      botOpenId: ctx.lark.botOpenId,
+      runtime: ctx.runtime,
+      chatHistories: ctx.chatHistories,
+      accountId,
+    });
+  } catch (err) {
+    error(`feishu[${accountId}]: error handling comment event: ${String(err)}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Card action handler
 // ---------------------------------------------------------------------------
 
 export async function handleCardActionEvent(ctx: MonitorContext, data: unknown): Promise<unknown> {
   try {
-    // AskUserQuestion card interactions — injects synthetic message
-    // carrying user answers for the AI to receive in a new turn.
+    // AskUserQuestion：表单卡片交互（宿主内建能力优先）
     const askResult = handleAskUserAction(data, ctx.cfg, ctx.accountId);
     if (askResult !== undefined) return askResult;
 
-    // Auto-auth card actions (OAuth device flow, app scope confirmation)
+    // auto-auth：授权/权限引导相关卡片交互（宿主内建能力优先）
     const authResult = await handleCardAction(data, ctx.cfg, ctx.accountId);
     if (authResult !== undefined) return authResult;
 
-    // Generic fallback for card button callbacks: if a button carries a
-    // slash command in action.value.command (or action.value.text), inject
-    // it as a synthetic inbound text message so normal command routing runs.
+    // 业务自定义卡片交互：使用 SDK 标准 interactive dispatch 管道转发给业务插件。
+    const pluginResult = await dispatchFeishuPluginInteractiveHandler({
+      cfg: ctx.cfg,
+      accountId: ctx.accountId,
+      data,
+    });
+    if (pluginResult !== undefined) return pluginResult;
+
+    // 通用回退：当按钮直接携带 slash 命令时，桥接为合成文本消息复用现有命令路由。
     const bridge = extractGenericCallbackCommand(data);
     if (!bridge) return undefined;
 

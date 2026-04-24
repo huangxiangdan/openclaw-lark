@@ -102,7 +102,9 @@ export type ToolActionKey =
   | 'feishu_create_doc.default'
   | 'feishu_doc_comments.create'
   | 'feishu_doc_comments.list'
+  | 'feishu_doc_comments.list_replies'
   | 'feishu_doc_comments.patch'
+  | 'feishu_doc_comments.reply'
   | 'feishu_doc_media.download'
   | 'feishu_doc_media.insert'
   | 'feishu_drive_file.copy'
@@ -125,12 +127,18 @@ export type ToolActionKey =
   | 'feishu_task_comment.create'
   | 'feishu_task_comment.get'
   | 'feishu_task_comment.list'
+  | 'feishu_task_section.create'
+  | 'feishu_task_section.get'
+  | 'feishu_task_section.list'
+  | 'feishu_task_section.patch'
+  | 'feishu_task_section.tasks'
   | 'feishu_task_subtask.create'
   | 'feishu_task_subtask.list'
   | 'feishu_task_task.create'
   | 'feishu_task_task.get'
   | 'feishu_task_task.list'
   | 'feishu_task_task.patch'
+  | 'feishu_task_task.add_members'
   | 'feishu_task_tasklist.add_members'
   | 'feishu_task_tasklist.create'
   | 'feishu_task_tasklist.get'
@@ -226,6 +234,7 @@ export const TOOL_SCOPES: ToolScopeMapping = {
   'feishu_task_task.get': ['task:task:read', 'task:task:write'],
   'feishu_task_task.list': ['task:task:read', 'task:task:write'],
   'feishu_task_task.patch': ['task:task:write', 'task:task:writeonly'],
+  'feishu_task_task.add_members': ['task:task:write', 'task:task:writeonly'],
   'feishu_task_tasklist.create': ['task:tasklist:write'],
   'feishu_task_tasklist.get': ['task:tasklist:read', 'task:tasklist:write'],
   'feishu_task_tasklist.list': ['task:tasklist:read', 'task:tasklist:write'],
@@ -235,6 +244,11 @@ export const TOOL_SCOPES: ToolScopeMapping = {
   'feishu_task_comment.create': ['task:comment:write'],
   'feishu_task_comment.list': ['task:comment:read', 'task:comment:write'],
   'feishu_task_comment.get': ['task:comment:read', 'task:comment:write'],
+  'feishu_task_section.create': ['task:task'],
+  'feishu_task_section.get': ['task:task'],
+  'feishu_task_section.list': ['task:task'],
+  'feishu_task_section.patch': ['task:task'],
+  'feishu_task_section.tasks': ['task:task'],
   'feishu_task_subtask.create': ['task:task:write'],
   'feishu_task_subtask.list': ['task:task:read', 'task:task:write'],
   'feishu_chat.search': ['im:chat:read'],
@@ -250,7 +264,9 @@ export const TOOL_SCOPES: ToolScopeMapping = {
   'feishu_doc_media.download': ['board:whiteboard:node:read', 'docs:document.media:download'],
   'feishu_doc_media.insert': ['docx:document:write_only', 'docs:document.media:upload'],
   'feishu_doc_comments.list': ['wiki:node:read', 'docs:document.comment:read'],
+  'feishu_doc_comments.list_replies': ['wiki:node:read', 'docs:document.comment:read'],
   'feishu_doc_comments.create': ['wiki:node:read', 'docs:document.comment:create'],
+  'feishu_doc_comments.reply': ['wiki:node:read', 'docs:document.comment:create'],
   'feishu_doc_comments.patch': ['docs:document.comment:update'],
   'feishu_wiki_space.list': ['wiki:space:retrieve'],
   'feishu_wiki_space.get': ['wiki:space:read'],

@@ -264,11 +264,11 @@ export class LarkClient {
   // ---- Bot identity ----------------------------------------------------------
 
   /**
-   * Probe bot identity via the `bot/v3/info` API.
+   * Probe bot identity via the `bot/v1/openclaw_bot/ping` API.
    * Results are cached on the instance for subsequent access via
    * `botOpenId` / `botName`.
    */
-  async probe(opts?: { maxAgeMs?: number }): Promise<FeishuProbeResult> {
+  async probe(opts?: { maxAgeMs?: number; needBotInfo?: boolean }): Promise<FeishuProbeResult> {
     const maxAge = opts?.maxAgeMs ?? 0;
 
     if (maxAge > 0 && this._lastProbeResult && Date.now() - this._lastProbeAt < maxAge) {
@@ -280,10 +280,11 @@ export class LarkClient {
     }
 
     try {
+      const needBotInfo = opts?.needBotInfo ?? true;
       const res = await (this.sdk as any).request({
-        method: 'GET',
-        url: '/open-apis/bot/v3/info',
-        data: {},
+        method: 'POST',
+        url: '/open-apis/bot/v1/openclaw_bot/ping',
+        data: { needBotInfo },
       });
 
       if (res.code !== 0) {
@@ -297,9 +298,9 @@ export class LarkClient {
         return result;
       }
 
-      const bot = res.bot || res.data?.bot;
-      this._botOpenId = bot?.open_id;
-      this._botName = bot?.bot_name;
+      const botInfo = res.data?.pingBotInfo;
+      this._botOpenId = botInfo?.botID;
+      this._botName = botInfo?.botName;
 
       const result: FeishuProbeResult = {
         ok: true,
@@ -475,20 +476,34 @@ injectLarkClient(LarkClient);
 // ---------------------------------------------------------------------------
 
 /**
- * Returns the freshest available config for account resolution.
+ * Returns the best available config for account resolution.
+ *
+ * Priority: live config (has `channels.feishu`) > fallback (has
+ * `channels.feishu`) > live config (last resort).
  *
  * The `config` object captured in tool-registration closures may be stale
- * after a hot-reload: openclaw re-initialises the runtime but the plugin
- * closure still holds the old snapshot.  Calling
- * `LarkClient.runtime.config.loadConfig()` always returns the current live
- * config, so account lookups pick up any changes made since plugin load.
+ * after a hot-reload, so we prefer the live config from
+ * `LarkClient.runtime.config.loadConfig()`.  However, `loadConfig()` may
+ * return `{}` when the runtime config snapshot has been cleared (e.g. in
+ * isolated cron sessions), so we fall back to the closure-captured config
+ * when the live result lacks Feishu credentials.
  *
  * @param fallback - Config to use when the runtime is not yet initialised
- *   (e.g. during early startup before the first `LarkClient.runtime` attach).
+ *   or when `loadConfig()` returns an incomplete config.
  */
 export function getResolvedConfig(fallback: ClawdbotConfig): ClawdbotConfig {
   try {
-    return LarkClient.runtime.config.loadConfig() as ClawdbotConfig;
+    const live = LarkClient.runtime.config.loadConfig() as ClawdbotConfig;
+    // loadConfig() may return {} (empty config) when runtimeConfigSnapshot
+    // has been cleared (e.g. after writeConfigFile, secrets teardown, or
+    // concurrent cron race conditions in isolated sessions).  In that case
+    // the closure-captured fallback still holds a valid resolved config.
+    if (live?.channels?.feishu) return live;
+    if (fallback?.channels?.feishu) {
+      log.debug(`loadConfig() returned config without channels.feishu, using fallback`);
+      return fallback;
+    }
+    return live;
   } catch {
     // runtime not yet initialised — fall back to passed config
     return fallback;
