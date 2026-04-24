@@ -27,8 +27,8 @@ import {
 import { registerCommands } from './src/commands/index';
 import { larkLogger } from './src/core/lark-logger';
 import { emitSecurityWarnings } from './src/core/security-check';
-import { sendMessageFeishu, sendCardFeishu } from './src/messaging/outbound/send';
-import { sendTextLark, sendCardLark } from './src/messaging/outbound/deliver';
+import { sendCardFeishu, sendMessageFeishu } from './src/messaging/outbound/send';
+import { sendCardLark, sendTextLark } from './src/messaging/outbound/deliver';
 import { recordToolUseEnd, recordToolUseStart } from './src/card/tool-use-trace-store';
 import { sanitizeParamsForLog } from './src/card/reasoning-utils';
 
